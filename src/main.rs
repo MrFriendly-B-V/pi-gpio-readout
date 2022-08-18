@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::process::exit;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 use clap::Parser;
 use rppal::gpio::{Gpio, InputPin, Level};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use crate::args::{Args, InputMode};
 use anyhow::Result;
 
@@ -12,7 +15,13 @@ mod args;
 fn main() {
     let args = Args::parse();
     configure_tracing(&args);
+
     info!("Starting {} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+
+    if !nix::unistd::getuid().is_root() {
+        error!("This program requires root access to run");
+        exit(1);
+    }
 
     defer_main(&args).expect("Error");
 }
@@ -28,7 +37,7 @@ fn defer_main(args: &Args) -> Result<()> {
     if let Some(pin) = args.pin {
         pins.insert(pin, get_pin(&gpio, pin, input_mode)?);
     } else {
-        // The RPI has 27 GPIO pins
+        // The RPI has 28 GPIO pins, starting at 0
         for i in 0..28 {
             pins.insert(i, get_pin(&gpio, i, input_mode)?);
         }
@@ -49,8 +58,8 @@ fn defer_main(args: &Args) -> Result<()> {
                     // If the condition evaluates to true,
                     // we shouldn't print the value if it is equal to the previous value
                     if !reprint_if_eq {
-                        // SAFETY: there are only 27 pins, so the idx
-                        // will never exceed 27.
+                        // SAFETY: there are only 28 pins, so the idx
+                        // will never exceed 28.
                         let prev_value = unsafe { prev_values.get_unchecked(v.0 as usize) };
 
                         // There is a previous value stored, check it for equality
@@ -73,9 +82,18 @@ fn defer_main(args: &Args) -> Result<()> {
     });
 
     loop {
+        let wait_time = Duration::from_nanos(500000);
+
         for (idx, pin) in pins.iter_mut() {
+            let now = Instant::now();
+
             let level = pin.read();
             tx.send((*idx, level)).expect("RX channel closed");
+
+            let runtime = now.elapsed();
+            if let Some(remaining) = wait_time.checked_sub(runtime) {
+                sleep(remaining);
+            }
         }
     }
 }

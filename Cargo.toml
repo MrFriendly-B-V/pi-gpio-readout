@@ -8,6 +8,7 @@ tracing = "0.1.36"
 tracing-subscriber = "0.3.15"
 anyhow = "1"
 rppal = "0.13.1"
+nix = "0.25.0"
 
 [dependencies.clap]
 version = "3.2.17"
