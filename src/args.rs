@@ -19,8 +19,18 @@ pub struct Args {
     /// Should the value be printed again if
     /// it's value is equal to the previous value from that pin.
     /// When unspecified, this defaults to true.
-    #[clap(short, long)]
-    pub reprint_if_previous_equal: Option<bool>,
+    /// When `--print-only-bits` is specified, this option is ignored
+    #[clap(long, action)]
+    pub reprint_if_previous_equal: bool,
+    /// Print only the bits, rather than HIGH/LOW and a timestamp
+    /// This only works is `--pin` is provided.
+    /// Enabling this option, ignores whatever is set for `--reprint-if-previous-equal`
+    #[clap(long, action)]
+    pub print_only_bits: bool,
+    /// How many bits per seconds should be read.
+    /// Default: 1000
+    #[clap(long)]
+    pub bitrate: Option<u64>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
